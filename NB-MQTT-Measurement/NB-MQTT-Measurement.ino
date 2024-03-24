@@ -1,41 +1,44 @@
-// libraries
 #include <MKRNB.h>
 #include <ArduinoMqttClient.h>
 
-// The MKRNB lib needs this even if it's blank
 const char PINNUMBER[] = "";
 
-// Broker details
+//MQTT configurations
 const char broker[] = "test.mosquitto.org";
 int port = 1883;
 const char topic[] = "nbiot_test";
+const char idListTopic[] = "nbiot_test_ids";
+const char reception_delay[] = "nbiot_delay";
 
-// Initialize the library instances
 NBClient client;
 GPRS gprs;
 NB nbAccess;
 
 MqttClient mqttClient(client);
 
-// Timestamp variables
+
+int maxIds;             // Maximum number of IDs to store
+
+char *messageIds; // Single string for message IDs
+int numMessagesSent = 0;
+
+unsigned long startTime = 0;
 unsigned long sendTime = 0;
 unsigned long receptionDelay = 0;
 
+// Mission parameters
+const int idLength = 6; // Adjust the length as needed
+unsigned long messageInterval = 1000; // Interval between messages in milliseconds
+unsigned long duration = 60000;       // Duration in milliseconds
+
+
 void setup() {
-  // initialize serial communications and wait for port to open:
   Serial.begin(9600);
-  while (!Serial) {
-    ; // wait for serial port to connect. Needed for native USB port only
-  }
+  while (!Serial);
 
-  Serial.println("Warming up....");
-
-  // connection state
   boolean connected = false;
-
-  Serial.println("Connecting to NbIOT and GPRS network...");
-
   while (!connected) {
+    Serial.println("Connecting to NbIOT Network ... ");
     if ((nbAccess.begin(PINNUMBER) == NB_READY) &&
         (gprs.attachGPRS() == GPRS_READY)) {
       connected = true;
@@ -46,40 +49,69 @@ void setup() {
     }
   }
 
-  Serial.println("Connecting to the MQTT broker...");
-
-  Serial.println(broker);
-
   if (!mqttClient.connect(broker, port)) {
     Serial.print("MQTT connection failed! Error code = ");
     Serial.println(mqttClient.connectError());
-
     while (1);
   }
 
   Serial.println("You're connected to the MQTT broker!");
-  Serial.println();
 
   mqttClient.onMessage(onMqttMessage);
 
-  Serial.print("Subscribing to topic: ");
-  Serial.println(topic);
-  Serial.println();
-
-  // subscribe to a topic
+  // Subscribe to the topic for receiving ACKs or other messages related to the ID list
+  //mqttClient.subscribe(idListTopic);
   mqttClient.subscribe(topic);
+
+  startTime = millis(); // Record the start time
+
+  // Calculate maxIds based on duration and messageInterval
+  maxIds = duration / messageInterval;
+
+  // Allocate memory for messageIds
+  messageIds = (char *)malloc((idLength + 1) * maxIds * sizeof(char));
+  messageIds[0] = '\0'; // Initialize the string
 }
 
 void loop() {
   mqttClient.poll();
-  delay(2000);
+  unsigned long currentTime = millis();
+  unsigned long elapsedTime = currentTime - startTime;
 
-  // Record the time just before sending the message
-  sendTime = millis();
+  if (elapsedTime >= duration) {
+    if (numMessagesSent > 0) {
+      Serial.println("Duration elapsed, sending the list of IDs.");
+      sendIdList();
+    }
+    return;
+  }
 
-  mqttClient.beginMessage(topic);
-  mqttClient.print("NB IOT Example");
-  mqttClient.endMessage();
+  if (currentTime - sendTime >= messageInterval) {
+    sendTime = currentTime;
+
+    // Generate unique ID for this message
+    char messageId[idLength + 1];
+    generateUniqueId(messageId, idLength);
+
+    // Append the ID to the messageIds string
+    if (numMessagesSent > 0) {
+      strcat(messageIds, " ");
+    }
+    strcat(messageIds, messageId);
+
+    // Send the message with the ID as payload
+    mqttClient.beginMessage(topic);
+    mqttClient.print(messageId);
+    mqttClient.endMessage();
+
+    numMessagesSent++;
+
+    // Calculate reception delay
+    receptionDelay = millis() - sendTime;
+    Serial.print("Reception Delay: ");
+    Serial.print(receptionDelay);
+    Serial.println(" milliseconds");
+  }
 }
 
 void onMqttMessage(int messageSize) {
@@ -96,11 +128,31 @@ void onMqttMessage(int messageSize) {
   }
   Serial.println();
 
-  // Calculate reception delay
-  receptionDelay = millis() - sendTime;
-  Serial.print("Reception Delay: ");
-  Serial.print(receptionDelay);
-  Serial.println(" milliseconds");
+  mqttClient.poll();
+  delay(2000);
+  mqttClient.beginMessage(reception_delay);
+  mqttClient.print(receptionDelay);
+  mqttClient.endMessage();
 
   Serial.println();
+}
+
+void generateUniqueId(char *buffer, int length) {
+  const char charset[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+  for (int i = 0; i < length; i++) {
+    buffer[i] = charset[random(sizeof(charset) - 1)];
+  }
+  buffer[length] = '\0';
+}
+
+void sendIdList() {
+  // Send the list of IDs to a separate topic
+  mqttClient.beginMessage(idListTopic);
+  mqttClient.print(messageIds);
+  mqttClient.endMessage();
+
+  // Clear the messageIds string
+  messageIds[0] = '\0';
+
+  numMessagesSent = 0;
 }
