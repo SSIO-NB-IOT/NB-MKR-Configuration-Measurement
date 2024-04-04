@@ -52,3 +52,61 @@ This guide will walk you through the process of setting up and launching an Ardu
 - Refer to the documentation provided with your Arduino MKR 1500 for additional assistance.
 
 Follow these steps carefully to successfully launch your Arduino NB-IoT application. If you encounter any issues, refer to troubleshooting guides or seek assistance from relevant forums and communities.
+
+# Documentation: Configuration Sketch
+
+This documentation provides an overview and explanation of the Arduino sketch used to configure the preferred Radio Access Technology (RAT) and extended Discontinuous Reception (eDRX) settings for an Arduino MKR NB 1500 board.
+
+## Overview
+
+The provided sketch allows users to select their preferred 4G Narrowband Radio Access Technology (RAT) and eDRX configuration. These configurations are crucial for establishing and maintaining network connectivity for NB-IoT applications.
+
+## Usage
+
+1. **Setup:**
+   - Connect your Arduino MKR NB 1500 board to your computer via USB.
+   - Open the Arduino IDE and upload the provided sketch to the board.
+
+2. **Configuration:**
+   - Upon uploading the sketch, the Serial Monitor will prompt you to choose your preferred RAT and eDRX configuration.
+   - RAT options:
+     - CAT M1 only (0)
+     - NB IoT only (1)
+     - CAT M1 preferred, NB IoT as failover (2)
+     - NB IoT preferred, CAT M1 as failover (3)
+   - eDRX options:
+     - Disable eDRX (0)
+     - Enable eDRX with TAU of 10.24s (1)
+     - Enable eDRX with TAU of 20.48s (2)
+     - Enable eDRX with TAU of 40.96s (3)
+     - Enable eDRX with TAU of 61.44s (4)
+
+3. **Selection:**
+   - Enter the corresponding number for your preferred RAT and eDRX configuration in the Serial Monitor.
+   - The sketch will set the chosen configuration and apply the changes.
+
+4. **Apply Changes:**
+   - The selected RAT and eDRX configuration will be saved to the modem's internal memory.
+   - The changes will be applied, and the configuration will be preserved through subsequent uploads of MKR NB 1500 sketches.
+
+## Functions
+
+### `setRAT(String choice, String edrx)`
+
+- **Description:** Sets the RAT and eDRX configuration based on user input.
+- **Parameters:**
+  - `choice`: String representing the chosen RAT configuration.
+  - `edrx`: String representing the chosen eDRX configuration.
+- **Returns:** `true` if the configuration is successfully set.
+
+### `apply()`
+
+- **Description:** Applies the changes and saves the configuration to the modem's internal memory.
+- **Returns:** `true` if the changes are successfully applied.
+
+## Additional Notes
+
+- Ensure that the SIM card inserted into the Arduino MKR NB 1500 board supports NB-IoT network.
+- Refer to the documentation provided by Arduino for more information on configuring and using the MKR NB 1500 board.
+
+
